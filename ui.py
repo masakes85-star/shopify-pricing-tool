@@ -376,6 +376,26 @@ if (
     )
 
     # ==========================================
+    # CLOTH & PAPER
+    # ==========================================
+
+    st.header(
+        "Cloth & Paper producten"
+    )
+
+    clothpaper_df = pd.DataFrame([
+
+        p for p in competitor_products
+        if p["shop"] == "Cloth & Paper"
+
+    ])
+
+    st.dataframe(
+        clothpaper_df,
+        use_container_width=True
+    )
+
+    # ==========================================
     # EXCEL EXPORT
     # ==========================================
 
@@ -437,6 +457,13 @@ if (
 
             writer,
             sheet_name="Sames Journal",
+            index=False
+        )
+
+        clothpaper_df.to_excel(
+
+            writer,
+            sheet_name="Cloth & Paper",
             index=False
         )
 
