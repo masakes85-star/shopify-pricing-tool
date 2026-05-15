@@ -1,196 +1,203 @@
 import requests
+import time
 
 SHOPS = {
-    "Lovely Dots":
-        "https://lovelydots.nl/products.json?limit=25000",
-
-    "Crea with Gaby":
-        "https://creawithgaby.com/products.json?limit=25000",
-
-    "Sames Journal":
-        "https://samesjournal.com/products.json?limit=25000",
-
-    "Cloth & Paper":
-        "https://www.clothandpaper.com/products.json?limit=25000",
+    "Lovely Dots": "https://lovelydots.nl",
+    "Crea with Gaby": "https://creawithgaby.com",
+    "Sames Journal": "https://samesjournal.com",
+    "Cloth & Paper": "https://www.clothandpaper.com",
 }
 
 
-def fetch_products(shop_name, url):
+# ==========================================
+# HELPER: PARSE NEXT PAGE URL
+# ==========================================
 
-    response = requests.get(url)
+def get_next_link(response):
 
-    response.raise_for_status()
+    link_header = response.headers.get("Link")
 
-    data = response.json()["products"]
+    if not link_header:
+        return None
+
+    links = link_header.split(",")
+
+    for link in links:
+        if 'rel="next"' in link:
+            return link.split(";")[0].strip()[1:-1]
+
+    return None
+
+
+# ==========================================
+# FETCH PRODUCTEN MET PAGINATION
+# ==========================================
+
+def fetch_products(shop_name, base_url):
+
+    url = f"{base_url}/products.json?limit=250"
 
     products = []
 
-    for product in data:
+    while url:
 
-        product_title = product.get(
-            "title",
-            ""
-        )
+        print(f"Ophalen: {shop_name} → {url}")
 
-        for variant in product.get(
-            "variants",
-            []
-        ):
+        response = requests.get(url)
+        response.raise_for_status()
 
-            variant_title = variant.get(
-                "title",
-                ""
-            )
+        data = response.json().get("products", [])
 
-            # ==========================================
-            # FULL TITLE
-            # ==========================================
+        for product in data:
 
-            full_title = product_title
+            product_title = product.get("title", "")
 
-            if (
-                variant_title
-                and variant_title
-                != "Default Title"
-            ):
+            for variant in product.get("variants", []):
 
-                full_title += (
-                    f" - {variant_title}"
-                )
+                variant_title = variant.get("title", "")
 
-            # ==========================================
-            # PRIJS
-            # ==========================================
+                full_title = product_title
 
-            try:
+                if (
+                    variant_title
+                    and variant_title != "Default Title"
+                ):
+                    full_title += f" - {variant_title}"
 
-                price = float(
-                    variant.get(
-                        "price",
-                        0
-                    )
-                )
+                try:
+                    price = float(variant.get("price", 0))
+                except:
+                    price = 0
 
-            except:
+                products.append({
 
-                price = 0
+                    "shop": shop_name,
 
-            # ==========================================
-            # PRODUCT TOEVOEGEN
-            # ==========================================
+                    "title": full_title,
 
-            products.append({
+                    "product_title": product_title,
 
-                "shop":
-                    shop_name,
+                    "variant_title": variant_title,
 
-                "title":
-                    full_title,
+                    "price": price,
 
-                "product_title":
-                    product_title,
+                    "compare_at_price":
+                        variant.get("compare_at_price"),
 
-                "variant_title":
-                    variant_title,
+                    "sku":
+                        str(variant.get("sku", "")).strip(),
 
-                "price":
-                    price,
+                    "variant_id":
+                        variant.get("id"),
 
-                "compare_at_price":
-                    variant.get(
-                        "compare_at_price"
-                    ),
+                    "product_id":
+                        product.get("id"),
 
-                "sku":
-                    str(
-                        variant.get(
-                            "sku",
-                            ""
-                        )
-                    ).strip(),
+                    "handle":
+                        str(product.get("handle", "")).strip(),
 
-                "variant_id":
-                    variant.get("id"),
+                    "vendor":
+                        product.get("vendor"),
 
-                "product_id":
-                    product.get("id"),
+                    "product_type":
+                        product.get("product_type"),
 
-                "handle":
-                    str(
-                        product.get(
-                            "handle",
-                            ""
-                        )
-                    ).strip(),
+                    "tags":
+                        product.get("tags"),
 
-                "vendor":
-                    product.get(
-                        "vendor"
-                    ),
+                    "url":
+                        f"{base_url}/products/{product.get('handle')}"
+                })
 
-                "product_type":
-                    product.get(
-                        "product_type"
-                    ),
+        # ==========================================
+        # NEXT PAGE
+        # ==========================================
 
-                "tags":
-                    product.get(
-                        "tags"
-                    ),
+        url = get_next_link(response)
 
-                "created_at":
-                    product.get(
-                        "created_at"
-                    ),
+        time.sleep(0.2)  # throttle (voorkomt blokkades)
 
-                "updated_at":
-                    product.get(
-                        "updated_at"
-                    ),
-
-                "url":
-                    (
-                        f"https://"
-                        f"{url.split('/')[2]}"
-                        f"/products/"
-                        f"{product.get('handle')}"
-                    )
-            })
+    print(f"{shop_name}: {len(products)} producten totaal")
 
     return products
 
+
+# ==========================================
+# FALLBACK PER PRODUCT
+# ==========================================
+
+def fetch_product_by_handle(base_url, handle):
+
+    try:
+
+        url = f"{base_url}/products/{handle}.js"
+
+        response = requests.get(url)
+
+        if response.status_code != 200:
+            return None
+
+        product = response.json()
+
+        product_title = product.get("title", "")
+
+        results = []
+
+        for variant in product.get("variants", []):
+
+            variant_title = variant.get("title", "")
+
+            full_title = product_title
+
+            if variant_title and variant_title != "Default Title":
+                full_title += f" - {variant_title}"
+
+            results.append({
+
+                "shop": base_url,
+
+                "title": full_title,
+
+                "product_title": product_title,
+
+                "variant_title": variant_title,
+
+                "price": float(variant.get("price", 0)) / 100,
+
+                "sku": str(variant.get("sku", "")).strip(),
+
+                "handle": handle,
+
+                "url": f"{base_url}/products/{handle}"
+            })
+
+        return results
+
+    except:
+        return None
+
+
+# ==========================================
+# MAIN FETCH
+# ==========================================
 
 def fetch_all_products():
 
     all_products = []
 
-    for shop_name, url in SHOPS.items():
-
-        print(
-            f"Ophalen: {shop_name}"
-        )
+    for shop_name, base_url in SHOPS.items():
 
         try:
 
-            products = fetch_products(
+            shop_products = fetch_products(
                 shop_name,
-                url
+                base_url
             )
 
-            print(
-                f"{len(products)} "
-                f"producten gevonden"
-            )
-
-            all_products.extend(
-                products
-            )
+            all_products.extend(shop_products)
 
         except Exception as e:
 
-            print(
-                f"Fout bij "
-                f"{shop_name}: {e}"
-            )
+            print(f"Fout bij {shop_name}: {e}")
 
     return all_products
