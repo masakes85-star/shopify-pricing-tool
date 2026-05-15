@@ -1,5 +1,6 @@
 import requests
 import time
+import re
 
 SHOPS = {
     "Lovely Dots": "https://lovelydots.nl",
@@ -30,7 +31,7 @@ def get_next_link(response):
 
 
 # ==========================================
-# FETCH PRODUCTS (PAGINATION)
+# PAGINATION FETCH
 # ==========================================
 
 def fetch_products(shop_name, base_url):
@@ -40,8 +41,6 @@ def fetch_products(shop_name, base_url):
     products = []
 
     while url:
-
-        print(f"Ophalen: {shop_name} → {url}")
 
         response = requests.get(url)
         response.raise_for_status()
@@ -76,14 +75,8 @@ def fetch_products(shop_name, base_url):
                     "product_title": product_title,
                     "variant_title": variant_title,
                     "price": price,
-                    "compare_at_price": variant.get("compare_at_price"),
                     "sku": str(variant.get("sku", "")).strip(),
-                    "variant_id": variant.get("id"),
-                    "product_id": product.get("id"),
                     "handle": str(product.get("handle", "")).strip(),
-                    "vendor": product.get("vendor"),
-                    "product_type": product.get("product_type"),
-                    "tags": product.get("tags"),
                     "url": f"{base_url}/products/{product.get('handle')}"
                 })
 
@@ -91,28 +84,23 @@ def fetch_products(shop_name, base_url):
 
         time.sleep(0.2)
 
-    print(f"{shop_name}: {len(products)} producten totaal")
-
     return products
 
 
 # ==========================================
-# FALLBACK VIA .JS
+# FALLBACK VIA HANDLE
 # ==========================================
 
 def fetch_product_by_handle(base_url, handle):
 
     try:
-
         url = f"{base_url}/products/{handle}.js"
-
         response = requests.get(url)
 
         if response.status_code != 200:
             return None
 
         product = response.json()
-
         product_title = product.get("title", "")
 
         results = []
@@ -140,43 +128,26 @@ def fetch_product_by_handle(base_url, handle):
 
         return results
 
-    except Exception as e:
-
-        print(f"Fallback fout ({handle}): {e}")
-
+    except:
         return None
 
 
 # ==========================================
-# ENSURE MISSING PRODUCTS
+# COLLECTION SCRAPER (KEY FIX)
 # ==========================================
 
-def ensure_missing_products(products, base_url):
+def fetch_handles_from_collection(base_url):
 
-    existing_handles = set(
-        p["handle"] for p in products
+    url = f"{base_url}/collections/all"
+
+    response = requests.get(url)
+    html = response.text
+
+    handles = set(
+        re.findall(r'/products/([^"]+)', html)
     )
 
-    # 👉 voeg hier producten toe die je weet dat soms missen
-    known_problem_handles = [
-        "floral-washi-tape-homebody-collection-30mm"
-    ]
-
-    for handle in known_problem_handles:
-
-        if handle not in existing_handles:
-
-            print(f"Fallback ophalen: {handle}")
-
-            extra = fetch_product_by_handle(
-                base_url,
-                handle
-            )
-
-            if extra:
-                products.extend(extra)
-
-    return products
+    return list(handles)
 
 
 # ==========================================
@@ -189,20 +160,39 @@ def fetch_all_products():
 
     for shop_name, base_url in SHOPS.items():
 
+        print(f"Ophalen: {shop_name}")
+
         try:
 
-            shop_products = fetch_products(
+            products = fetch_products(
                 shop_name,
                 base_url
             )
 
-            # 🔥 fallback check toevoegen
-            shop_products = ensure_missing_products(
-                shop_products,
+            existing_handles = set(
+                p["handle"] for p in products
+            )
+
+            # 🔥 EXTRA: haal alles uit collection
+            handles = fetch_handles_from_collection(
                 base_url
             )
 
-            all_products.extend(shop_products)
+            for handle in handles:
+
+                if handle not in existing_handles:
+
+                    extra = fetch_product_by_handle(
+                        base_url,
+                        handle
+                    )
+
+                    if extra:
+                        products.extend(extra)
+
+            print(f"{shop_name}: {len(products)} totaal")
+
+            all_products.extend(products)
 
         except Exception as e:
 
