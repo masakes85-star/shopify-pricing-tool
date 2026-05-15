@@ -10,7 +10,7 @@ SHOPS = {
 
 
 # ==========================================
-# HELPER: PARSE NEXT PAGE URL
+# NEXT PAGE PARSER
 # ==========================================
 
 def get_next_link(response):
@@ -30,7 +30,7 @@ def get_next_link(response):
 
 
 # ==========================================
-# FETCH PRODUCTEN MET PAGINATION
+# FETCH PRODUCTS (PAGINATION)
 # ==========================================
 
 def fetch_products(shop_name, base_url):
@@ -72,50 +72,24 @@ def fetch_products(shop_name, base_url):
                 products.append({
 
                     "shop": shop_name,
-
                     "title": full_title,
-
                     "product_title": product_title,
-
                     "variant_title": variant_title,
-
                     "price": price,
-
-                    "compare_at_price":
-                        variant.get("compare_at_price"),
-
-                    "sku":
-                        str(variant.get("sku", "")).strip(),
-
-                    "variant_id":
-                        variant.get("id"),
-
-                    "product_id":
-                        product.get("id"),
-
-                    "handle":
-                        str(product.get("handle", "")).strip(),
-
-                    "vendor":
-                        product.get("vendor"),
-
-                    "product_type":
-                        product.get("product_type"),
-
-                    "tags":
-                        product.get("tags"),
-
-                    "url":
-                        f"{base_url}/products/{product.get('handle')}"
+                    "compare_at_price": variant.get("compare_at_price"),
+                    "sku": str(variant.get("sku", "")).strip(),
+                    "variant_id": variant.get("id"),
+                    "product_id": product.get("id"),
+                    "handle": str(product.get("handle", "")).strip(),
+                    "vendor": product.get("vendor"),
+                    "product_type": product.get("product_type"),
+                    "tags": product.get("tags"),
+                    "url": f"{base_url}/products/{product.get('handle')}"
                 })
-
-        # ==========================================
-        # NEXT PAGE
-        # ==========================================
 
         url = get_next_link(response)
 
-        time.sleep(0.2)  # throttle (voorkomt blokkades)
+        time.sleep(0.2)
 
     print(f"{shop_name}: {len(products)} producten totaal")
 
@@ -123,7 +97,7 @@ def fetch_products(shop_name, base_url):
 
 
 # ==========================================
-# FALLBACK PER PRODUCT
+# FALLBACK VIA .JS
 # ==========================================
 
 def fetch_product_by_handle(base_url, handle):
@@ -155,30 +129,58 @@ def fetch_product_by_handle(base_url, handle):
             results.append({
 
                 "shop": base_url,
-
                 "title": full_title,
-
                 "product_title": product_title,
-
                 "variant_title": variant_title,
-
                 "price": float(variant.get("price", 0)) / 100,
-
                 "sku": str(variant.get("sku", "")).strip(),
-
                 "handle": handle,
-
                 "url": f"{base_url}/products/{handle}"
             })
 
         return results
 
-    except:
+    except Exception as e:
+
+        print(f"Fallback fout ({handle}): {e}")
+
         return None
 
 
 # ==========================================
-# MAIN FETCH
+# ENSURE MISSING PRODUCTS
+# ==========================================
+
+def ensure_missing_products(products, base_url):
+
+    existing_handles = set(
+        p["handle"] for p in products
+    )
+
+    # 👉 voeg hier producten toe die je weet dat soms missen
+    known_problem_handles = [
+        "floral-washi-tape-homebody-collection-30mm"
+    ]
+
+    for handle in known_problem_handles:
+
+        if handle not in existing_handles:
+
+            print(f"Fallback ophalen: {handle}")
+
+            extra = fetch_product_by_handle(
+                base_url,
+                handle
+            )
+
+            if extra:
+                products.extend(extra)
+
+    return products
+
+
+# ==========================================
+# MAIN
 # ==========================================
 
 def fetch_all_products():
@@ -191,6 +193,12 @@ def fetch_all_products():
 
             shop_products = fetch_products(
                 shop_name,
+                base_url
+            )
+
+            # 🔥 fallback check toevoegen
+            shop_products = ensure_missing_products(
+                shop_products,
                 base_url
             )
 
