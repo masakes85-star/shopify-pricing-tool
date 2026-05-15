@@ -16,7 +16,6 @@ SHOPS = {
 # ==========================================
 
 def get_next_link(response):
-
     link_header = response.headers.get("Link")
 
     if not link_header:
@@ -38,7 +37,6 @@ def get_next_link(response):
 def fetch_products(shop_name, base_url):
 
     url = f"{base_url}/products.json?limit=250"
-
     products = []
 
     while url:
@@ -67,7 +65,6 @@ def fetch_products(shop_name, base_url):
                     price = 0
 
                 products.append({
-
                     "shop": shop_name,
                     "title": full_title,
                     "product_title": product_title,
@@ -79,7 +76,6 @@ def fetch_products(shop_name, base_url):
                 })
 
         url = get_next_link(response)
-
         time.sleep(0.1)
 
     return products
@@ -104,7 +100,7 @@ def fetch_handles_from_collection(base_url):
 
 
 # ==========================================
-# SITEMAP SCRAPER (CORRECT)
+# SITEMAP SCRAPER
 # ==========================================
 
 def fetch_handles_from_sitemap(base_url):
@@ -136,14 +132,14 @@ def fetch_handles_from_sitemap(base_url):
 
             handles.update(found)
 
-    except Exception as e:
-        print("Sitemap error:", e)
+    except:
+        pass
 
     return list(handles)
 
 
 # ==========================================
-# FALLBACK PER PRODUCT
+# FALLBACK VIA .JS
 # ==========================================
 
 def fetch_product_by_handle(base_url, handle):
@@ -170,7 +166,6 @@ def fetch_product_by_handle(base_url, handle):
                 full_title += f" - {variant_title}"
 
             results.append({
-
                 "shop": base_url,
                 "title": full_title,
                 "product_title": product_title,
@@ -188,7 +183,40 @@ def fetch_product_by_handle(base_url, handle):
 
 
 # ==========================================
-# MAIN FUNCTION (OPTIMIZED + FIX)
+# HTML FALLBACK (EDGE CASE FIX)
+# ==========================================
+
+def fetch_product_from_html(base_url, handle):
+
+    try:
+        url = f"{base_url}/products/{handle}"
+        response = requests.get(url)
+
+        if response.status_code != 200:
+            return None
+
+        html = response.text
+
+        title_match = re.search(r'<title>(.*?)</title>', html)
+        title = title_match.group(1) if title_match else handle
+
+        return [{
+            "shop": base_url,
+            "title": title,
+            "product_title": title,
+            "variant_title": "",
+            "price": 0,
+            "sku": "",
+            "handle": handle,
+            "url": url
+        }]
+
+    except:
+        return None
+
+
+# ==========================================
+# MAIN FUNCTION
 # ==========================================
 
 def fetch_all_products():
@@ -221,8 +249,8 @@ def fetch_all_products():
 
             print(f"Missende handles: {len(missing_handles)}")
 
-            # 🔥 PERFORMANCE FIX
-            LIMIT = 100
+            # 🔥 PERFORMANCE LIMIT
+            LIMIT = 80
 
             if len(missing_handles) > LIMIT:
                 missing_handles = random.sample(missing_handles, LIMIT)
@@ -243,7 +271,7 @@ def fetch_all_products():
 
 
     # ==========================================
-    # 🔥 MANUAL OVERRIDE (JOUW FIX)
+    # 🔥 EDGE CASE FIX (JOUW PRODUCT)
     # ==========================================
 
     known_missing = [
@@ -253,6 +281,9 @@ def fetch_all_products():
     for shop_name, base_url, handle in known_missing:
 
         extra = fetch_product_by_handle(base_url, handle)
+
+        if not extra:
+            extra = fetch_product_from_html(base_url, handle)
 
         if extra:
             print(f"Handmatig toegevoegd: {handle}")
