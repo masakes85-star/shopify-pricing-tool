@@ -12,7 +12,7 @@ SHOPS = {
 
 
 # ==========================================
-# NEXT PAGE PARSER
+# PAGINATION HELPER
 # ==========================================
 
 def get_next_link(response):
@@ -32,7 +32,7 @@ def get_next_link(response):
 
 
 # ==========================================
-# FETCH VIA API
+# API FETCH
 # ==========================================
 
 def fetch_products(shop_name, base_url):
@@ -104,7 +104,7 @@ def fetch_handles_from_collection(base_url):
 
 
 # ==========================================
-# SITEMAP SCRAPER (FIXED)
+# SITEMAP SCRAPER (CORRECT)
 # ==========================================
 
 def fetch_handles_from_sitemap(base_url):
@@ -188,7 +188,7 @@ def fetch_product_by_handle(base_url, handle):
 
 
 # ==========================================
-# MAIN (OPTIMIZED)
+# MAIN FUNCTION (OPTIMIZED + FIX)
 # ==========================================
 
 def fetch_all_products():
@@ -221,7 +221,7 @@ def fetch_all_products():
 
             print(f"Missende handles: {len(missing_handles)}")
 
-            # 🔥 BELANGRIJK: LIMIT + RANDOM SAMPLE
+            # 🔥 PERFORMANCE FIX
             LIMIT = 100
 
             if len(missing_handles) > LIMIT:
@@ -240,5 +240,22 @@ def fetch_all_products():
 
         except Exception as e:
             print(f"Fout bij {shop_name}: {e}")
+
+
+    # ==========================================
+    # 🔥 MANUAL OVERRIDE (JOUW FIX)
+    # ==========================================
+
+    known_missing = [
+        ("Crea with Gaby", "https://creawithgaby.com", "floral-washi-tape-homebody-collection-30mm")
+    ]
+
+    for shop_name, base_url, handle in known_missing:
+
+        extra = fetch_product_by_handle(base_url, handle)
+
+        if extra:
+            print(f"Handmatig toegevoegd: {handle}")
+            all_products.extend(extra)
 
     return all_products
