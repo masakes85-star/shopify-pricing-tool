@@ -55,9 +55,7 @@ if mode == "Vergelijk met eigen CSV":
 # START BUTTON
 # ==========================================
 
-start_clicked = st.button(
-    "Start"
-)
+start_clicked = st.button("Start")
 
 if (
     (
@@ -73,7 +71,7 @@ if (
 ):
 
     # ==========================================
-    # EIGEN PRODUCTEN INLADEN
+    # EIGEN PRODUCTEN
     # ==========================================
 
     my_products = []
@@ -81,9 +79,7 @@ if (
 
     if mode == "Vergelijk met eigen CSV":
 
-        my_df = pd.read_csv(
-            uploaded_file
-        )
+        my_df = pd.read_csv(uploaded_file)
 
         my_df = my_df[
             my_df["Variant Price"].notna()
@@ -106,66 +102,49 @@ if (
                 and variant_title != "nan"
                 and variant_title != "Default Title"
             ):
-                full_title += (
-                    f" - {variant_title}"
-                )
+                full_title += f" - {variant_title}"
 
             try:
-
                 price = float(
-                    row.get(
-                        "Variant Price",
-                        0
-                    )
+                    row.get("Variant Price", 0)
                 )
-
             except:
-
                 price = 0
 
             my_products.append({
 
                 "shop": "My Shop",
-
                 "title": full_title,
-
-                "product_title":
-                    product_title,
-
-                "variant_title":
-                    variant_title,
-
-                "price":
-                    price,
-
-                "sku":
-                    str(
-                        row.get(
-                            "Variant SKU",
-                            ""
-                        )
-                    ).strip(),
-
-                "handle":
-                    str(
-                        row.get(
-                            "Handle",
-                            ""
-                        )
-                    ).strip(),
+                "product_title": product_title,
+                "variant_title": variant_title,
+                "price": price,
+                "sku": str(
+                    row.get("Variant SKU", "")
+                ).strip(),
+                "handle": str(
+                    row.get("Handle", "")
+                ).strip(),
             })
 
     # ==========================================
     # CONCURRENTEN OPHALEN
     # ==========================================
 
-    with st.spinner(
-        "Concurrent producten ophalen..."
-    ):
+    with st.spinner("Concurrent producten ophalen..."):
+        competitor_products = fetch_all_products()
 
-        competitor_products = (
-            fetch_all_products()
-        )
+    # ==========================================
+    # 🔥 DEBUG (BELANGRIJK)
+    # ==========================================
+
+    st.write("TOTAL PRODUCTS:", len(competitor_products))
+
+    test = [
+        p for p in competitor_products
+        if "floral-washi" in p["title"].lower()
+    ]
+
+    st.write("TEST RESULT:", test)
 
     # ==========================================
     # MATCHING
@@ -176,9 +155,7 @@ if (
 
     if mode == "Vergelijk met eigen CSV":
 
-        with st.spinner(
-            "Producten vergelijken..."
-        ):
+        with st.spinner("Producten vergelijken..."):
 
             (
                 matches,
@@ -186,16 +163,13 @@ if (
                 unmatched_competitors
 
             ) = find_matches(
-
                 my_products,
                 competitor_products
             )
 
     else:
 
-        unmatched_competitors = (
-            competitor_products
-        )
+        unmatched_competitors = competitor_products
 
     # ==========================================
     # MATCHES
@@ -203,85 +177,54 @@ if (
 
     if mode == "Vergelijk met eigen CSV":
 
-        st.header(
-            "Gematchte producten"
-        )
+        st.header("Gematchte producten")
 
         matched_results = []
 
         for match in matches:
 
             price_difference = round(
-
                 match["my_price"]
                 - match["competitor_price"],
-
                 2
             )
 
             matched_results.append({
 
-                "Mijn Full Titel":
-                    match[
-                        "my_full_title"
-                    ],
+                "Mijn Product":
+                    match["my_full_title"],
 
                 "Mijn SKU":
                     match["my_sku"],
-
-                "Mijn Handle":
-                    match[
-                        "my_handle"
-                    ],
 
                 "Mijn Prijs":
                     match["my_price"],
 
                 "Concurrent Shop":
-                    match[
-                        "competitor_shop"
-                    ],
+                    match["competitor_shop"],
 
-                "Concurrent Full Titel":
-                    match[
-                        "competitor_full_title"
-                    ],
+                "Concurrent Product":
+                    match["competitor_full_title"],
 
                 "Concurrent SKU":
-                    match[
-                        "competitor_sku"
-                    ],
-
-                "Concurrent Handle":
-                    match[
-                        "competitor_handle"
-                    ],
+                    match["competitor_sku"],
 
                 "Concurrent Prijs":
-                    match[
-                        "competitor_price"
-                    ],
+                    match["competitor_price"],
 
                 "Prijsverschil":
                     price_difference,
 
                 "Match Type":
-                    match[
-                        "match_type"
-                    ],
+                    match["match_type"],
 
                 "Match Score":
                     match["score"],
             })
 
-        matched_df = pd.DataFrame(
-            matched_results
-        )
+        matched_df = pd.DataFrame(matched_results)
 
-        st.success(
-            f"{len(matched_df)} "
-            f"matches gevonden"
-        )
+        st.success(f"{len(matched_df)} matches gevonden")
 
         st.dataframe(
             matched_df,
@@ -293,115 +236,35 @@ if (
         matched_df = pd.DataFrame()
 
     # ==========================================
-    # EIGEN PRODUCTEN ZONDER MATCH
+    # SHOPS WEERGAVE
     # ==========================================
 
-    if mode == "Vergelijk met eigen CSV":
+    def show_shop(shop_name):
 
-        st.header(
-            "Eigen producten zonder match"
-        )
+        st.header(f"{shop_name} producten")
 
-        unmatched_df = pd.DataFrame(
-            unmatched
-        )
+        df = pd.DataFrame([
+            p for p in competitor_products
+            if p["shop"] == shop_name
+        ])
 
         st.dataframe(
-            unmatched_df,
+            df,
             use_container_width=True
         )
 
-    else:
+        return df
 
-        unmatched_df = pd.DataFrame()
-
-    # ==========================================
-    # LOVELY DOTS
-    # ==========================================
-
-    st.header(
-        "Lovely Dots producten"
-    )
-
-    lovelydots_df = pd.DataFrame([
-
-        p for p in competitor_products
-        if p["shop"] == "Lovely Dots"
-
-    ])
-
-    st.dataframe(
-        lovelydots_df,
-        use_container_width=True
-    )
-
-    # ==========================================
-    # CREA WITH GABY
-    # ==========================================
-
-    st.header(
-        "Crea with Gaby producten"
-    )
-
-    gaby_df = pd.DataFrame([
-
-        p for p in competitor_products
-        if p["shop"] == "Crea with Gaby"
-
-    ])
-
-    st.dataframe(
-        gaby_df,
-        use_container_width=True
-    )
-
-    # ==========================================
-    # SAMES JOURNAL
-    # ==========================================
-
-    st.header(
-        "Sames Journal producten"
-    )
-
-    sames_df = pd.DataFrame([
-
-        p for p in competitor_products
-        if p["shop"] == "Sames Journal"
-
-    ])
-
-    st.dataframe(
-        sames_df,
-        use_container_width=True
-    )
-
-    # ==========================================
-    # CLOTH & PAPER
-    # ==========================================
-
-    st.header(
-        "Cloth & Paper producten"
-    )
-
-    clothpaper_df = pd.DataFrame([
-
-        p for p in competitor_products
-        if p["shop"] == "Cloth & Paper"
-
-    ])
-
-    st.dataframe(
-        clothpaper_df,
-        use_container_width=True
-    )
+    lovelydots_df = show_shop("Lovely Dots")
+    gaby_df = show_shop("Crea with Gaby")
+    sames_df = show_shop("Sames Journal")
+    clothpaper_df = show_shop("Cloth & Paper")
 
     # ==========================================
     # EXCEL EXPORT
     # ==========================================
 
-    st.header(
-        "Excel Export"
-    )
+    st.header("Excel Export")
 
     excel_buffer = BytesIO()
 
@@ -409,59 +272,40 @@ if (
         "%Y-%m-%d_%H-%M"
     )
 
-    file_name = (
-        f"pricing_export_"
-        f"{export_date}.xlsx"
-    )
+    file_name = f"pricing_export_{export_date}.xlsx"
 
     with pd.ExcelWriter(
-
         excel_buffer,
         engine="openpyxl"
-
     ) as writer:
 
-        if mode == (
-            "Vergelijk met eigen CSV"
-        ):
+        if mode == "Vergelijk met eigen CSV":
 
             matched_df.to_excel(
-
                 writer,
                 sheet_name="Matches",
                 index=False
             )
 
-            unmatched_df.to_excel(
-
-                writer,
-                sheet_name="Unmatched",
-                index=False
-            )
-
         lovelydots_df.to_excel(
-
             writer,
             sheet_name="Lovely Dots",
             index=False
         )
 
         gaby_df.to_excel(
-
             writer,
             sheet_name="Crea with Gaby",
             index=False
         )
 
         sames_df.to_excel(
-
             writer,
             sheet_name="Sames Journal",
             index=False
         )
 
         clothpaper_df.to_excel(
-
             writer,
             sheet_name="Cloth & Paper",
             index=False
@@ -474,12 +318,7 @@ if (
         label="Download Excel Export",
 
         data=excel_buffer,
-
         file_name=file_name,
 
-        mime=(
-            "application/"
-            "vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        )
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
