@@ -2,16 +2,16 @@ import requests
 
 SHOPS = {
     "Lovely Dots":
-        "https://lovelydots.nl/products.json?limit=250",
+        "https://lovelydots.nl/products.json?limit=25000",
 
     "Crea with Gaby":
-        "https://creawithgaby.com/products.json?limit=250",
+        "https://creawithgaby.com/products.json?limit=25000",
 
     "Sames Journal":
-        "https://samesjournal.com/products.json?limit=250",
+        "https://samesjournal.com/products.json?limit=25000",
 
     "Cloth & Paper":
-        "https://www.clothandpaper.com/products.json?limit=250",
+        "https://www.clothandpaper.com/products.json?limit=25000",
 }
 
 
