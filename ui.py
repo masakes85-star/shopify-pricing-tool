@@ -6,7 +6,10 @@ from competitor_fetcher import (
     fetch_product_from_url
 )
 
-from matcher import find_matches  # blijft zoals je al had
+from matcher import find_matches
+
+from io import BytesIO
+from datetime import datetime
 
 
 # ==========================================
@@ -21,7 +24,7 @@ st.write("Vergelijk jouw Shopify CSV export of bekijk alleen concurrenten")
 
 
 # ==========================================
-# MODE SELECTIE
+# MODE
 # ==========================================
 
 mode = st.radio(
@@ -53,15 +56,15 @@ if mode == "Vergelijk met eigen CSV":
 if st.button("Start"):
 
     # ==========================================
-    # EIGEN PRODUCTEN INLEZEN
+    # EIGEN PRODUCTEN
     # ==========================================
 
     my_products = []
+    results = []
 
     if mode == "Vergelijk met eigen CSV" and uploaded_file:
 
         df = pd.read_csv(uploaded_file)
-
         df = df[df["Variant Price"].notna()]
 
         for _, row in df.iterrows():
@@ -93,8 +96,9 @@ if st.button("Start"):
                 "handle": str(row.get("Handle", "")).strip(),
             })
 
+
     # ==========================================
-    # CONCURRENTEN OPHALEN
+    # CONCURRENTEN
     # ==========================================
 
     with st.spinner("Concurrent producten ophalen..."):
@@ -107,7 +111,6 @@ if st.button("Start"):
         p for p in competitor_products
         if "floral-washi" in p["title"].lower()
     ]
-
     st.write("TEST RESULT:", test)
 
 
@@ -125,8 +128,6 @@ if st.button("Start"):
             )
 
         st.subheader("Matches")
-
-        results = []
 
         for m in matches:
 
@@ -149,7 +150,7 @@ if st.button("Start"):
 
 
     # ==========================================
-    # PER SHOP OVERZICHT
+    # PER SHOP
     # ==========================================
 
     def show_shop(name):
@@ -166,6 +167,56 @@ if st.button("Start"):
     show_shop("Crea with Gaby")
     show_shop("Sames Journal")
     show_shop("Cloth & Paper")
+
+
+    # ==========================================
+    # 📥 EXCEL EXPORT
+    # ==========================================
+
+    st.subheader("Excel Export")
+
+    excel_buffer = BytesIO()
+
+    export_date = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    file_name = f"pricing_export_{export_date}.xlsx"
+
+    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+
+        # MATCHES
+        if mode == "Vergelijk met eigen CSV" and uploaded_file:
+            pd.DataFrame(results).to_excel(
+                writer,
+                sheet_name="Matches",
+                index=False
+            )
+
+        # SHOPS
+        for shop in [
+            "Lovely Dots",
+            "Crea with Gaby",
+            "Sames Journal",
+            "Cloth & Paper"
+        ]:
+
+            df = pd.DataFrame([
+                p for p in competitor_products
+                if p["shop"] == shop
+            ])
+
+            df.to_excel(
+                writer,
+                sheet_name=shop[:31],
+                index=False
+            )
+
+    excel_buffer.seek(0)
+
+    st.download_button(
+        label="📥 Download Excel",
+        data=excel_buffer,
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 
 # ==========================================
