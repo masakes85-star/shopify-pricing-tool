@@ -6,18 +6,98 @@ from competitor_fetcher import (
     fetch_product_from_url
 )
 
+from matcher import find_matches  # blijft zoals je al had
+
+
+# ==========================================
+# CONFIG
+# ==========================================
+
 st.set_page_config(layout="wide")
 
 st.title("Shopify Competitor Comparison Tool")
 
+st.write("Vergelijk jouw Shopify CSV export of bekijk alleen concurrenten")
+
+
+# ==========================================
+# MODE SELECTIE
+# ==========================================
+
 mode = st.radio(
     "Kies modus",
-    ["Alleen concurrenten bekijken"]
+    [
+        "Vergelijk met eigen CSV",
+        "Alleen concurrenten bekijken"
+    ]
 )
+
+
+# ==========================================
+# CSV UPLOAD
+# ==========================================
+
+uploaded_file = None
+
+if mode == "Vergelijk met eigen CSV":
+    uploaded_file = st.file_uploader(
+        "Upload Shopify Product CSV",
+        type=["csv"]
+    )
+
+
+# ==========================================
+# START
+# ==========================================
 
 if st.button("Start"):
 
-    with st.spinner("Producten ophalen..."):
+    # ==========================================
+    # EIGEN PRODUCTEN INLEZEN
+    # ==========================================
+
+    my_products = []
+
+    if mode == "Vergelijk met eigen CSV" and uploaded_file:
+
+        df = pd.read_csv(uploaded_file)
+
+        df = df[df["Variant Price"].notna()]
+
+        for _, row in df.iterrows():
+
+            product_title = str(row.get("Title", "")).strip()
+            variant_title = str(row.get("Option1 Value", "")).strip()
+
+            full_title = product_title
+
+            if (
+                variant_title
+                and variant_title != "nan"
+                and variant_title != "Default Title"
+            ):
+                full_title += f" - {variant_title}"
+
+            try:
+                price = float(row.get("Variant Price", 0))
+            except:
+                price = 0
+
+            my_products.append({
+                "shop": "My Shop",
+                "title": full_title,
+                "product_title": product_title,
+                "variant_title": variant_title,
+                "price": price,
+                "sku": str(row.get("Variant SKU", "")).strip(),
+                "handle": str(row.get("Handle", "")).strip(),
+            })
+
+    # ==========================================
+    # CONCURRENTEN OPHALEN
+    # ==========================================
+
+    with st.spinner("Concurrent producten ophalen..."):
         competitor_products = fetch_all_products()
 
     st.write("TOTAL PRODUCTS:", len(competitor_products))
@@ -30,11 +110,50 @@ if st.button("Start"):
 
     st.write("TEST RESULT:", test)
 
+
     # ==========================================
-    # PER SHOP
+    # MATCHING
+    # ==========================================
+
+    if mode == "Vergelijk met eigen CSV" and uploaded_file:
+
+        with st.spinner("Vergelijken..."):
+
+            matches, unmatched, _ = find_matches(
+                my_products,
+                competitor_products
+            )
+
+        st.subheader("Matches")
+
+        results = []
+
+        for m in matches:
+
+            diff = round(
+                m["my_price"] - m["competitor_price"], 2
+            )
+
+            results.append({
+                "Mijn Product": m["my_full_title"],
+                "Mijn SKU": m["my_sku"],
+                "Mijn Prijs": m["my_price"],
+                "Concurrent": m["competitor_shop"],
+                "Product": m["competitor_full_title"],
+                "Prijs": m["competitor_price"],
+                "Verschil": diff,
+                "Score": m["score"]
+            })
+
+        st.dataframe(pd.DataFrame(results), use_container_width=True)
+
+
+    # ==========================================
+    # PER SHOP OVERZICHT
     # ==========================================
 
     def show_shop(name):
+
         df = pd.DataFrame([
             p for p in competitor_products
             if p["shop"] == name
@@ -57,18 +176,19 @@ st.divider()
 st.subheader("Handmatig product ophalen")
 
 manual_url = st.text_input(
-    "Plak Shopify product URL"
+    "Plak Shopify product URL",
+    placeholder="https://creawithgaby.com/products/..."
 )
 
 if st.button("Haal product op"):
 
     if manual_url:
 
-        with st.spinner("Ophalen..."):
+        with st.spinner("Product ophalen..."):
             result = fetch_product_from_url(manual_url)
 
         if result:
             st.success("Product gevonden")
-            st.dataframe(pd.DataFrame(result))
+            st.dataframe(pd.DataFrame(result), use_container_width=True)
         else:
-            st.error("Niet gevonden")
+            st.error("Kon product niet ophalen")
