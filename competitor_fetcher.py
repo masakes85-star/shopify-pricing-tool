@@ -11,7 +11,7 @@ SHOPS = {
 
 
 # ==========================================
-# NEXT PAGE PARSER
+# NEXT PAGE PARSER (SHOPIFY PAGINATION)
 # ==========================================
 
 def get_next_link(response):
@@ -31,7 +31,7 @@ def get_next_link(response):
 
 
 # ==========================================
-# PAGINATION FETCH
+# FETCH VIA API (products.json)
 # ==========================================
 
 def fetch_products(shop_name, base_url):
@@ -57,10 +57,7 @@ def fetch_products(shop_name, base_url):
 
                 full_title = product_title
 
-                if (
-                    variant_title
-                    and variant_title != "Default Title"
-                ):
+                if variant_title and variant_title != "Default Title":
                     full_title += f" - {variant_title}"
 
                 try:
@@ -88,7 +85,71 @@ def fetch_products(shop_name, base_url):
 
 
 # ==========================================
-# FALLBACK VIA HANDLE
+# FETCH VIA COLLECTION (VISIBLE PRODUCTS)
+# ==========================================
+
+def fetch_handles_from_collection(base_url):
+
+    try:
+        url = f"{base_url}/collections/all"
+        response = requests.get(url)
+        html = response.text
+
+        handles = set(
+            re.findall(r'/products/([^"]+)', html)
+        )
+
+        return list(handles)
+
+    except:
+        return []
+
+
+# ==========================================
+# FETCH VIA SITEMAP (ALLES)
+# ==========================================
+
+def fetch_handles_from_sitemap(base_url):
+
+    handles = set()
+
+    try:
+        index_url = f"{base_url}/sitemap.xml"
+        response = requests.get(index_url)
+        xml = response.text
+
+        sitemap_links = re.findall(
+            r'<loc>(.*?)</loc>',
+            xml
+        )
+
+        product_sitemaps = [
+            url for url in sitemap_links
+            if "sitemap_products" in url
+        ]
+
+        for sitemap_url in product_sitemaps:
+
+            print("Opening sitemap:", sitemap_url)
+
+            res = requests.get(sitemap_url)
+            sitemap_xml = res.text
+
+            found = re.findall(
+                r'/products/([^<]+)',
+                sitemap_xml
+            )
+
+            handles.update(found)
+
+    except Exception as e:
+        print("Sitemap error:", e)
+
+    return list(handles)
+
+
+# ==========================================
+# FETCH PER PRODUCT (FALLBACK)
 # ==========================================
 
 def fetch_product_by_handle(base_url, handle):
@@ -133,25 +194,7 @@ def fetch_product_by_handle(base_url, handle):
 
 
 # ==========================================
-# COLLECTION SCRAPER (KEY FIX)
-# ==========================================
-
-def fetch_handles_from_collection(base_url):
-
-    url = f"{base_url}/collections/all"
-
-    response = requests.get(url)
-    html = response.text
-
-    handles = set(
-        re.findall(r'/products/([^"]+)', html)
-    )
-
-    return list(handles)
-
-
-# ==========================================
-# MAIN
+# MAIN FUNCTION
 # ==========================================
 
 def fetch_all_products():
@@ -160,37 +203,38 @@ def fetch_all_products():
 
     for shop_name, base_url in SHOPS.items():
 
-        print(f"Ophalen: {shop_name}")
+        print(f"\n=== {shop_name} ===")
 
         try:
 
-            products = fetch_products(
-                shop_name,
-                base_url
-            )
+            # 1. API
+            products = fetch_products(shop_name, base_url)
 
             existing_handles = set(
                 p["handle"] for p in products
             )
 
-            # 🔥 EXTRA: haal alles uit collection
-            handles = fetch_handles_from_collection(
-                base_url
-            )
+            # 2. COLLECTION
+            collection_handles = fetch_handles_from_collection(base_url)
 
-            for handle in handles:
+            # 3. SITEMAP
+            sitemap_handles = fetch_handles_from_sitemap(base_url)
+
+            all_handles = set(collection_handles) | set(sitemap_handles)
+
+            print(f"Extra handles gevonden: {len(all_handles)}")
+
+            # 4. FILL GAPS
+            for handle in all_handles:
 
                 if handle not in existing_handles:
 
-                    extra = fetch_product_by_handle(
-                        base_url,
-                        handle
-                    )
+                    extra = fetch_product_by_handle(base_url, handle)
 
                     if extra:
                         products.extend(extra)
 
-            print(f"{shop_name}: {len(products)} totaal")
+            print(f"TOTAAL {shop_name}: {len(products)} producten")
 
             all_products.extend(products)
 
