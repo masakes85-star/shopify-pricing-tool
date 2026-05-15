@@ -12,7 +12,7 @@ SHOPS = {
 
 
 # ==========================================
-# PAGINATION HELPER
+# PAGINATION
 # ==========================================
 
 def get_next_link(response):
@@ -40,7 +40,6 @@ def fetch_products(shop_name, base_url):
     products = []
 
     while url:
-
         response = requests.get(url)
         response.raise_for_status()
 
@@ -55,7 +54,6 @@ def fetch_products(shop_name, base_url):
                 variant_title = variant.get("title", "")
 
                 full_title = product_title
-
                 if variant_title and variant_title != "Default Title":
                     full_title += f" - {variant_title}"
 
@@ -88,13 +86,8 @@ def fetch_products(shop_name, base_url):
 def fetch_handles_from_collection(base_url):
 
     try:
-        response = requests.get(f"{base_url}/collections/all")
-        html = response.text
-
-        return list(set(
-            re.findall(r'/products/([^"]+)', html)
-        ))
-
+        html = requests.get(f"{base_url}/collections/all").text
+        return list(set(re.findall(r'/products/([^"]+)', html)))
     except:
         return []
 
@@ -110,10 +103,7 @@ def fetch_handles_from_sitemap(base_url):
     try:
         index = requests.get(f"{base_url}/sitemap.xml").text
 
-        sitemap_links = re.findall(
-            r'<loc>(.*?)</loc>',
-            index
-        )
+        sitemap_links = re.findall(r'<loc>(.*?)</loc>', index)
 
         product_sitemaps = [
             url for url in sitemap_links
@@ -121,15 +111,9 @@ def fetch_handles_from_sitemap(base_url):
         ]
 
         for sitemap_url in product_sitemaps:
+            xml = requests.get(sitemap_url).text
 
-            res = requests.get(sitemap_url)
-            xml = res.text
-
-            found = re.findall(
-                r'/products/([^<]+)',
-                xml
-            )
-
+            found = re.findall(r'/products/([^<]+)', xml)
             handles.update(found)
 
     except:
@@ -139,10 +123,10 @@ def fetch_handles_from_sitemap(base_url):
 
 
 # ==========================================
-# FALLBACK VIA .JS
+# FALLBACK (.JS)
 # ==========================================
 
-def fetch_product_by_handle(base_url, handle):
+def fetch_product_by_handle(shop_name, base_url, handle):
 
     try:
         url = f"{base_url}/products/{handle}.js"
@@ -161,12 +145,11 @@ def fetch_product_by_handle(base_url, handle):
             variant_title = variant.get("title", "")
 
             full_title = product_title
-
             if variant_title and variant_title != "Default Title":
                 full_title += f" - {variant_title}"
 
             results.append({
-                "shop": base_url,
+                "shop": shop_name,  # 🔥 FIX
                 "title": full_title,
                 "product_title": product_title,
                 "variant_title": variant_title,
@@ -183,40 +166,23 @@ def fetch_product_by_handle(base_url, handle):
 
 
 # ==========================================
-# HTML FALLBACK (EDGE CASE FIX)
+# HANDMATIGE URL FETCH (NIEUW 🔥)
 # ==========================================
 
-def fetch_product_from_html(base_url, handle):
+def fetch_product_from_url(product_url):
 
     try:
-        url = f"{base_url}/products/{handle}"
-        response = requests.get(url)
+        base = product_url.split("/products/")[0]
+        handle = product_url.split("/products/")[1].split("?")[0]
 
-        if response.status_code != 200:
-            return None
-
-        html = response.text
-
-        title_match = re.search(r'<title>(.*?)</title>', html)
-        title = title_match.group(1) if title_match else handle
-
-        return [{
-            "shop": base_url,
-            "title": title,
-            "product_title": title,
-            "variant_title": "",
-            "price": 0,
-            "sku": "",
-            "handle": handle,
-            "url": url
-        }]
+        return fetch_product_by_handle("Manual", base, handle)
 
     except:
         return None
 
 
 # ==========================================
-# MAIN FUNCTION
+# MAIN
 # ==========================================
 
 def fetch_all_products():
@@ -225,18 +191,12 @@ def fetch_all_products():
 
     for shop_name, base_url in SHOPS.items():
 
-        print(f"\n=== {shop_name} ===")
-
         try:
 
-            # 1. API
             products = fetch_products(shop_name, base_url)
 
-            existing_handles = set(
-                p["handle"] for p in products
-            )
+            existing_handles = set(p["handle"] for p in products)
 
-            # 2. EXTRA SOURCES
             collection_handles = fetch_handles_from_collection(base_url)
             sitemap_handles = fetch_handles_from_sitemap(base_url)
 
@@ -247,9 +207,7 @@ def fetch_all_products():
                 if h not in existing_handles
             ]
 
-            print(f"Missende handles: {len(missing_handles)}")
-
-            # 🔥 PERFORMANCE LIMIT
+            # 🔥 PERFORMANCE FIX
             LIMIT = 80
 
             if len(missing_handles) > LIMIT:
@@ -257,36 +215,18 @@ def fetch_all_products():
 
             for handle in missing_handles:
 
-                extra = fetch_product_by_handle(base_url, handle)
+                extra = fetch_product_by_handle(
+                    shop_name,
+                    base_url,
+                    handle
+                )
 
                 if extra:
                     products.extend(extra)
 
-            print(f"TOTAAL {shop_name}: {len(products)}")
-
             all_products.extend(products)
 
         except Exception as e:
-            print(f"Fout bij {shop_name}: {e}")
-
-
-    # ==========================================
-    # 🔥 EDGE CASE FIX (JOUW PRODUCT)
-    # ==========================================
-
-    known_missing = [
-        ("Crea with Gaby", "https://creawithgaby.com", "floral-washi-tape-homebody-collection-30mm")
-    ]
-
-    for shop_name, base_url, handle in known_missing:
-
-        extra = fetch_product_by_handle(base_url, handle)
-
-        if not extra:
-            extra = fetch_product_from_html(base_url, handle)
-
-        if extra:
-            print(f"Handmatig toegevoegd: {handle}")
-            all_products.extend(extra)
+            print(f"Error {shop_name}: {e}")
 
     return all_products
