@@ -414,7 +414,11 @@ if (
             "Vendor": p.get("vendor", ""),
             "Product Category": "",
             "Type": p.get("product_type", ""),
-            "Tags": p.get("tags", ""),
+            "Tags": (
+                ", ".join(p.get("tags", []))
+                if isinstance(p.get("tags"), list)
+                else p.get("tags", "")
+            ),
             "Published": "TRUE",
 
             "Option1 Name": "Title",
