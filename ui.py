@@ -394,17 +394,17 @@ if (
         clothpaper_df,
         use_container_width=True
     )
-# ==========================================
-# SHOPIFY IMPORT EXPORT
-# ==========================================
+    # ==========================================
+    # SHOPIFY IMPORT EXPORT
+    # ==========================================
 
-st.header(
-    "Shopify Import Export"
-)
+    st.header(
+        "Shopify Import Export"
+    )
 
-shopify_import_rows = []
+    shopify_import_rows = []
 
-for p in competitor_products:
+    for p in competitor_products:
 
     shopify_import_rows.append({
 
