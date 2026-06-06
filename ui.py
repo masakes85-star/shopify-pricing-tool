@@ -1,76 +1,103 @@
 import streamlit as st
 import pandas as pd
 
-from competitor_fetcher import (
-    fetch_all_products,
-    fetch_product_from_url
-)
-
-from matcher import find_matches
-
 from io import BytesIO
 from datetime import datetime
 
+from competitor_fetcher import fetch_all_products
+from matcher import find_matches
+
 
 # ==========================================
-# CONFIG
+# PAGE CONFIG
 # ==========================================
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title="Competitor Pricing Tool",
+    layout="wide"
+)
 
 st.title("Shopify Competitor Comparison Tool")
 
-st.write("Vergelijk jouw Shopify CSV export of bekijk alleen concurrenten")
-
+st.write(
+    "Vergelijk jouw Shopify CSV export "
+    "of bekijk alleen concurrenten"
+)
 
 # ==========================================
-# MODE
+# MODE SELECTIE
 # ==========================================
 
 mode = st.radio(
+
     "Kies modus",
+
     [
         "Vergelijk met eigen CSV",
         "Alleen concurrenten bekijken"
     ]
 )
 
-
 # ==========================================
-# CSV UPLOAD
+# CSV IMPORT
 # ==========================================
 
 uploaded_file = None
 
 if mode == "Vergelijk met eigen CSV":
+
     uploaded_file = st.file_uploader(
         "Upload Shopify Product CSV",
         type=["csv"]
     )
 
-
 # ==========================================
-# START
+# START BUTTON
 # ==========================================
 
-if st.button("Start"):
+start_clicked = st.button(
+    "Start"
+)
+
+if (
+    (
+        mode == "Vergelijk met eigen CSV"
+        and uploaded_file
+        and start_clicked
+    )
+    or
+    (
+        mode == "Alleen concurrenten bekijken"
+        and start_clicked
+    )
+):
 
     # ==========================================
-    # EIGEN PRODUCTEN
+    # EIGEN PRODUCTEN INLADEN
     # ==========================================
 
     my_products = []
-    results = []
+    my_df = pd.DataFrame()
 
-    if mode == "Vergelijk met eigen CSV" and uploaded_file:
+    if mode == "Vergelijk met eigen CSV":
 
-        df = pd.read_csv(uploaded_file)
-        df = df[df["Variant Price"].notna()]
+        my_df = pd.read_csv(
+            uploaded_file
+        )
 
-        for _, row in df.iterrows():
+        my_df = my_df[
+            my_df["Variant Price"].notna()
+        ]
 
-            product_title = str(row.get("Title", "")).strip()
-            variant_title = str(row.get("Option1 Value", "")).strip()
+        for _, row in my_df.iterrows():
+
+            product_title = str(
+                row.get("Title", "")
+            ).strip()
+
+            variant_title = str(
+                row.get("Option1 Value", "")
+            ).strip()
 
             full_title = product_title
 
@@ -79,167 +106,596 @@ if st.button("Start"):
                 and variant_title != "nan"
                 and variant_title != "Default Title"
             ):
-                full_title += f" - {variant_title}"
+                full_title += (
+                    f" - {variant_title}"
+                )
 
             try:
-                price = float(row.get("Variant Price", 0))
+
+                price = float(
+                    row.get(
+                        "Variant Price",
+                        0
+                    )
+                )
+
             except:
+
                 price = 0
 
             my_products.append({
+
                 "shop": "My Shop",
+
                 "title": full_title,
-                "product_title": product_title,
-                "variant_title": variant_title,
-                "price": price,
-                "sku": str(row.get("Variant SKU", "")).strip(),
-                "handle": str(row.get("Handle", "")).strip(),
+
+                "product_title":
+                    product_title,
+
+                "variant_title":
+                    variant_title,
+
+                "price":
+                    price,
+
+                "sku":
+                    str(
+                        row.get(
+                            "Variant SKU",
+                            ""
+                        )
+                    ).strip(),
+
+                "handle":
+                    str(
+                        row.get(
+                            "Handle",
+                            ""
+                        )
+                    ).strip(),
             })
 
-
     # ==========================================
-    # CONCURRENTEN
+    # CONCURRENTEN OPHALEN
     # ==========================================
 
-    with st.spinner("Concurrent producten ophalen..."):
-        competitor_products = fetch_all_products()
+    with st.spinner(
+        "Concurrent producten ophalen..."
+    ):
 
-    st.write("TOTAL PRODUCTS:", len(competitor_products))
-
-    # DEBUG
-    test = [
-        p for p in competitor_products
-        if "floral-washi" in p["title"].lower()
-    ]
-    st.write("TEST RESULT:", test)
-
+        competitor_products = (
+            fetch_all_products()
+        )
 
     # ==========================================
     # MATCHING
     # ==========================================
 
-    if mode == "Vergelijk met eigen CSV" and uploaded_file:
+    matches = []
+    unmatched = []
 
-        with st.spinner("Vergelijken..."):
+    if mode == "Vergelijk met eigen CSV":
 
-            matches, unmatched, _ = find_matches(
+        with st.spinner(
+            "Producten vergelijken..."
+        ):
+
+            (
+                matches,
+                unmatched,
+                unmatched_competitors
+
+            ) = find_matches(
+
                 my_products,
                 competitor_products
             )
 
-        st.subheader("Matches")
+    else:
 
-        for m in matches:
+        unmatched_competitors = (
+            competitor_products
+        )
 
-            diff = round(
-                m["my_price"] - m["competitor_price"], 2
+    # ==========================================
+    # MATCHES
+    # ==========================================
+
+    if mode == "Vergelijk met eigen CSV":
+
+        st.header(
+            "Gematchte producten"
+        )
+
+        matched_results = []
+
+        for match in matches:
+
+            price_difference = round(
+
+                match["my_price"]
+                - match["competitor_price"],
+
+                2
             )
 
-            results.append({
-                "Mijn Product": m["my_full_title"],
-                "Mijn SKU": m["my_sku"],
-                "Mijn Prijs": m["my_price"],
-                "Concurrent": m["competitor_shop"],
-                "Product": m["competitor_full_title"],
-                "Prijs": m["competitor_price"],
-                "Verschil": diff,
-                "Score": m["score"]
+            matched_results.append({
+
+                "Mijn Full Titel":
+                    match[
+                        "my_full_title"
+                    ],
+
+                "Mijn SKU":
+                    match["my_sku"],
+
+                "Mijn Handle":
+                    match[
+                        "my_handle"
+                    ],
+
+                "Mijn Prijs":
+                    match["my_price"],
+
+                "Concurrent Shop":
+                    match[
+                        "competitor_shop"
+                    ],
+
+                "Concurrent Full Titel":
+                    match[
+                        "competitor_full_title"
+                    ],
+
+                "Concurrent SKU":
+                    match[
+                        "competitor_sku"
+                    ],
+
+                "Concurrent Handle":
+                    match[
+                        "competitor_handle"
+                    ],
+
+                "Concurrent Prijs":
+                    match[
+                        "competitor_price"
+                    ],
+
+                "Prijsverschil":
+                    price_difference,
+
+                "Match Type":
+                    match[
+                        "match_type"
+                    ],
+
+                "Match Score":
+                    match["score"],
             })
 
-        st.dataframe(pd.DataFrame(results), use_container_width=True)
+        matched_df = pd.DataFrame(
+            matched_results
+        )
 
+        st.success(
+            f"{len(matched_df)} "
+            f"matches gevonden"
+        )
 
-    # ==========================================
-    # PER SHOP
-    # ==========================================
+        st.dataframe(
+            matched_df,
+            use_container_width=True
+        )
 
-    def show_shop(name):
+    else:
 
-        df = pd.DataFrame([
-            p for p in competitor_products
-            if p["shop"] == name
-        ])
-
-        st.subheader(f"{name} producten")
-        st.dataframe(df, use_container_width=True)
-
-    show_shop("Lovely Dots")
-    show_shop("Crea with Gaby")
-    show_shop("Sames Journal")
-    show_shop("Cloth & Paper")
-
+        matched_df = pd.DataFrame()
 
     # ==========================================
-    # 📥 EXCEL EXPORT
+    # EIGEN PRODUCTEN ZONDER MATCH
     # ==========================================
 
-    st.subheader("Excel Export")
+    if mode == "Vergelijk met eigen CSV":
+
+        st.header(
+            "Eigen producten zonder match"
+        )
+
+        unmatched_df = pd.DataFrame(
+            unmatched
+        )
+
+        st.dataframe(
+            unmatched_df,
+            use_container_width=True
+        )
+
+    else:
+
+        unmatched_df = pd.DataFrame()
+
+    # ==========================================
+    # LOVELY DOTS
+    # ==========================================
+
+    st.header(
+        "Lovely Dots producten"
+    )
+
+    lovelydots_df = pd.DataFrame([
+
+        p for p in competitor_products
+        if p["shop"] == "Lovely Dots"
+
+    ])
+
+    st.dataframe(
+        lovelydots_df,
+        use_container_width=True
+    )
+
+    # ==========================================
+    # CREA WITH GABY
+    # ==========================================
+
+    st.header(
+        "Crea with Gaby producten"
+    )
+
+    gaby_df = pd.DataFrame([
+
+        p for p in competitor_products
+        if p["shop"] == "Crea with Gaby"
+
+    ])
+
+    st.dataframe(
+        gaby_df,
+        use_container_width=True
+    )
+
+    # ==========================================
+    # SAMES JOURNAL
+    # ==========================================
+
+    st.header(
+        "Sames Journal producten"
+    )
+
+    sames_df = pd.DataFrame([
+
+        p for p in competitor_products
+        if p["shop"] == "Sames Journal"
+
+    ])
+
+    st.dataframe(
+        sames_df,
+        use_container_width=True
+    )
+
+    # ==========================================
+    # CLOTH & PAPER
+    # ==========================================
+
+    st.header(
+        "Cloth & Paper producten"
+    )
+
+    clothpaper_df = pd.DataFrame([
+
+        p for p in competitor_products
+        if p["shop"] == "Cloth & Paper"
+
+    ])
+
+    st.dataframe(
+        clothpaper_df,
+        use_container_width=True
+    )
+# ==========================================
+# SHOPIFY IMPORT EXPORT
+# ==========================================
+
+st.header(
+    "Shopify Import Export"
+)
+
+shopify_import_rows = []
+
+for p in competitor_products:
+
+    shopify_import_rows.append({
+
+        "Handle":
+            p.get(
+                "handle",
+                ""
+            ),
+
+        "Title":
+            p.get(
+                "product_title",
+                ""
+            ),
+
+        "Body (HTML)":
+            p.get(
+                "body_html",
+                ""
+            ),
+
+        "Vendor":
+            p.get(
+                "vendor",
+                ""
+            ),
+
+        "Product Category":
+            "",
+
+        "Type":
+            p.get(
+                "product_type",
+                ""
+            ),
+
+        "Tags":
+            p.get(
+                "tags",
+                ""
+            ),
+
+        "Published":
+            "TRUE",
+
+        "Option1 Name":
+            "Title",
+
+        "Option1 Value":
+            (
+                p.get(
+                    "variant_title",
+                    ""
+                )
+                or
+                "Default Title"
+            ),
+
+        "Option1 Linked To":
+            "",
+
+        "Option2 Name":
+            "",
+
+        "Option2 Value":
+            "",
+
+        "Option2 Linked To":
+            "",
+
+        "Option3 Name":
+            "",
+
+        "Option3 Value":
+            "",
+
+        "Option3 Linked To":
+            "",
+
+        "Variant SKU":
+            p.get(
+                "sku",
+                ""
+            ),
+
+        "Variant Grams":
+            "",
+
+        "Variant Inventory Tracker":
+            "shopify",
+
+        "Variant Inventory Qty":
+            p.get(
+                "inventory_qty",
+                ""
+            ),
+
+        "Variant Inventory Policy":
+            "deny",
+
+        "Variant Fulfillment Service":
+            "manual",
+
+        "Variant Price":
+            p.get(
+                "price",
+                ""
+            ),
+
+        "Variant Compare At Price":
+            p.get(
+                "compare_at_price",
+                ""
+            ),
+
+        "Variant Requires Shipping":
+            "TRUE",
+
+        "Variant Taxable":
+            "TRUE",
+
+        "Unit Price Total Measure":
+            "",
+
+        "Unit Price Total Measure Unit":
+            "",
+
+        "Unit Price Base Measure":
+            "",
+
+        "Unit Price Base Measure Unit":
+            "",
+
+        "Variant Barcode":
+            p.get(
+                "barcode",
+                ""
+            ),
+
+        "Image Src":
+            p.get(
+                "image_src",
+                ""
+            ),
+
+        "Image Position":
+            1,
+
+        "Image Alt Text":
+            "",
+
+        "Gift Card":
+            "FALSE",
+
+        "SEO Title":
+            "",
+
+        "SEO Description":
+            "",
+
+        "Kleur (product.metafields.shopify.color-pattern)":
+            "",
+
+        "Variant Image":
+            p.get(
+                "image_src",
+                ""
+            ),
+
+        "Variant Weight Unit":
+            "kg",
+
+        "Variant Tax Code":
+            "",
+
+        "Cost per item":
+            "",
+
+        "Status":
+            p.get(
+                "status",
+                "active"
+            )
+    })
+
+shopify_import_df = pd.DataFrame(
+    shopify_import_rows
+)
+
+csv_data = shopify_import_df.to_csv(
+    index=False
+).encode("utf-8")
+
+st.download_button(
+
+    label=
+        "📥 Download Shopify Import CSV",
+
+    data=csv_data,
+
+    file_name=
+        "shopify_import.csv",
+
+    mime=
+        "text/csv"
+)
+    # ==========================================
+    # EXCEL EXPORT
+    # ==========================================
+
+    st.header(
+        "Excel Export"
+    )
 
     excel_buffer = BytesIO()
 
-    export_date = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    file_name = f"pricing_export_{export_date}.xlsx"
+    export_date = datetime.now().strftime(
+        "%Y-%m-%d_%H-%M"
+    )
 
-    with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+    file_name = (
+        f"pricing_export_"
+        f"{export_date}.xlsx"
+    )
 
-        # MATCHES
-        if mode == "Vergelijk met eigen CSV" and uploaded_file:
-            pd.DataFrame(results).to_excel(
+    with pd.ExcelWriter(
+
+        excel_buffer,
+        engine="openpyxl"
+
+    ) as writer:
+
+        if mode == (
+            "Vergelijk met eigen CSV"
+        ):
+
+            matched_df.to_excel(
+
                 writer,
                 sheet_name="Matches",
                 index=False
             )
 
-        # SHOPS
-        for shop in [
-            "Lovely Dots",
-            "Crea with Gaby",
-            "Sames Journal",
-            "Cloth & Paper"
-        ]:
+            unmatched_df.to_excel(
 
-            df = pd.DataFrame([
-                p for p in competitor_products
-                if p["shop"] == shop
-            ])
-
-            df.to_excel(
                 writer,
-                sheet_name=shop[:31],
+                sheet_name="Unmatched",
                 index=False
             )
+
+        lovelydots_df.to_excel(
+
+            writer,
+            sheet_name="Lovely Dots",
+            index=False
+        )
+
+        gaby_df.to_excel(
+
+            writer,
+            sheet_name="Crea with Gaby",
+            index=False
+        )
+
+        sames_df.to_excel(
+
+            writer,
+            sheet_name="Sames Journal",
+            index=False
+        )
+
+        clothpaper_df.to_excel(
+
+            writer,
+            sheet_name="Cloth & Paper",
+            index=False
+        )
 
     excel_buffer.seek(0)
 
     st.download_button(
-        label="📥 Download Excel",
+
+        label="Download Excel Export",
+
         data=excel_buffer,
+
         file_name=file_name,
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        mime=(
+            "application/"
+            "vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        )
     )
-
-
-# ==========================================
-# 🔥 HANDMATIGE URL TOOL
-# ==========================================
-
-st.divider()
-st.subheader("Handmatig product ophalen")
-
-manual_url = st.text_input(
-    "Plak Shopify product URL",
-    placeholder="https://creawithgaby.com/products/..."
-)
-
-if st.button("Haal product op"):
-
-    if manual_url:
-
-        with st.spinner("Product ophalen..."):
-            result = fetch_product_from_url(manual_url)
-
-        if result:
-            st.success("Product gevonden")
-            st.dataframe(pd.DataFrame(result), use_container_width=True)
-        else:
-            st.error("Kon product niet ophalen")
