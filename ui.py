@@ -406,211 +406,86 @@ if (
 
     for p in competitor_products:
 
-    shopify_import_rows.append({
+        shopify_import_rows.append({
 
-        "Handle":
-            p.get(
-                "handle",
-                ""
+            "Handle": p.get("handle", ""),
+            "Title": p.get("product_title", ""),
+            "Body (HTML)": p.get("body_html", ""),
+            "Vendor": p.get("vendor", ""),
+            "Product Category": "",
+            "Type": p.get("product_type", ""),
+            "Tags": p.get("tags", ""),
+            "Published": "TRUE",
+
+            "Option1 Name": "Title",
+            "Option1 Value": (
+                p.get("variant_title", "")
+                or "Default Title"
             ),
 
-        "Title":
-            p.get(
-                "product_title",
-                ""
-            ),
+            "Option1 Linked To": "",
+            "Option2 Name": "",
+            "Option2 Value": "",
+            "Option2 Linked To": "",
+            "Option3 Name": "",
+            "Option3 Value": "",
+            "Option3 Linked To": "",
 
-        "Body (HTML)":
-            p.get(
-                "body_html",
-                ""
-            ),
+            "Variant SKU": p.get("sku", ""),
+            "Variant Grams": "",
+            "Variant Inventory Tracker": "shopify",
+            "Variant Inventory Qty": p.get("inventory_qty", ""),
+            "Variant Inventory Policy": "deny",
+            "Variant Fulfillment Service": "manual",
 
-        "Vendor":
-            p.get(
-                "vendor",
-                ""
-            ),
+            "Variant Price": p.get("price", ""),
+            "Variant Compare At Price": p.get("compare_at_price", ""),
 
-        "Product Category":
-            "",
+            "Variant Requires Shipping": "TRUE",
+            "Variant Taxable": "TRUE",
 
-        "Type":
-            p.get(
-                "product_type",
-                ""
-            ),
+            "Unit Price Total Measure": "",
+            "Unit Price Total Measure Unit": "",
+            "Unit Price Base Measure": "",
+            "Unit Price Base Measure Unit": "",
 
-        "Tags":
-            p.get(
-                "tags",
-                ""
-            ),
+            "Variant Barcode": p.get("barcode", ""),
 
-        "Published":
-            "TRUE",
+            "Image Src": p.get("image_src", ""),
+            "Image Position": 1,
+            "Image Alt Text": "",
 
-        "Option1 Name":
-            "Title",
+            "Gift Card": "FALSE",
 
-        "Option1 Value":
-            (
-                p.get(
-                    "variant_title",
-                    ""
-                )
-                or
-                "Default Title"
-            ),
+            "SEO Title": "",
+            "SEO Description": "",
 
-        "Option1 Linked To":
-            "",
+            "Kleur (product.metafields.shopify.color-pattern)": "",
 
-        "Option2 Name":
-            "",
+            "Variant Image": p.get("image_src", ""),
 
-        "Option2 Value":
-            "",
+            "Variant Weight Unit": "kg",
+            "Variant Tax Code": "",
 
-        "Option2 Linked To":
-            "",
+            "Cost per item": "",
 
-        "Option3 Name":
-            "",
+            "Status": p.get("status", "active")
+        })
 
-        "Option3 Value":
-            "",
+    shopify_import_df = pd.DataFrame(
+        shopify_import_rows
+    )
 
-        "Option3 Linked To":
-            "",
+    csv_data = shopify_import_df.to_csv(
+        index=False
+    ).encode("utf-8")
 
-        "Variant SKU":
-            p.get(
-                "sku",
-                ""
-            ),
-
-        "Variant Grams":
-            "",
-
-        "Variant Inventory Tracker":
-            "shopify",
-
-        "Variant Inventory Qty":
-            p.get(
-                "inventory_qty",
-                ""
-            ),
-
-        "Variant Inventory Policy":
-            "deny",
-
-        "Variant Fulfillment Service":
-            "manual",
-
-        "Variant Price":
-            p.get(
-                "price",
-                ""
-            ),
-
-        "Variant Compare At Price":
-            p.get(
-                "compare_at_price",
-                ""
-            ),
-
-        "Variant Requires Shipping":
-            "TRUE",
-
-        "Variant Taxable":
-            "TRUE",
-
-        "Unit Price Total Measure":
-            "",
-
-        "Unit Price Total Measure Unit":
-            "",
-
-        "Unit Price Base Measure":
-            "",
-
-        "Unit Price Base Measure Unit":
-            "",
-
-        "Variant Barcode":
-            p.get(
-                "barcode",
-                ""
-            ),
-
-        "Image Src":
-            p.get(
-                "image_src",
-                ""
-            ),
-
-        "Image Position":
-            1,
-
-        "Image Alt Text":
-            "",
-
-        "Gift Card":
-            "FALSE",
-
-        "SEO Title":
-            "",
-
-        "SEO Description":
-            "",
-
-        "Kleur (product.metafields.shopify.color-pattern)":
-            "",
-
-        "Variant Image":
-            p.get(
-                "image_src",
-                ""
-            ),
-
-        "Variant Weight Unit":
-            "kg",
-
-        "Variant Tax Code":
-            "",
-
-        "Cost per item":
-            "",
-
-        "Status":
-            p.get(
-                "status",
-                "active"
-            )
-    })
-
-shopify_import_df = pd.DataFrame(
-    shopify_import_rows
-)
-
-csv_data = shopify_import_df.to_csv(
-    index=False
-).encode("utf-8")
-
-st.download_button(
-
-    label=
-        "📥 Download Shopify Import CSV",
-
-    data=csv_data,
-
-    file_name=
-        "shopify_import.csv",
-
-    mime=
-        "text/csv"
-)
+    st.download_button(
+        label="📥 Download Shopify Import CSV",
+        data=csv_data,
+        file_name="shopify_import.csv",
+        mime="text/csv"
+    )
     # ==========================================
     # EXCEL EXPORT
     # ==========================================
